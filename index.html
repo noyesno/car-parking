@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+  padding:1em;
+}
+
+main {
+  margin:auto;
+}
+
+#car-steering {
+  display:inline-block;
+  position:absolute;
+  right:0px;
+  bottom: 120px;
+  text-align:center;
+}
+#car-steering input[type="range"] {
+   width:120px;
+}
+#car-gear {
+  display: inline-block;
+  position:absolute;
+  right: -8px;
+  bottom: 0px;
+  transform: rotate(-90deg);
+  transform-origin: 0 0;
+}
+
+#car-gear input[type="range"] {
+   vertical-align:middle;
+   width:60px;
+}
+</style>
+</head>
+<body>
+<!--
+
+swerve - 转向
+steer - 驾驶, 掌舵
+wheelbase  - 轴距
+wheeltread - 轮距
+Real Track / Rear Tread - 后轮距
+Front Track / Front Tread - 前轮距
+
+wheel-distance: 1540 mm
+zhou-distance:  2570 mm
+
+zhou-distance:  4245*1805*1695 mm
+weight: 1861 kg
+wheel: 215/60R17 96H
+
+power: 1368 ml / 110 kw
+
+
+转弯半径 = 6.50~8.00 m
+
+倒桩移库 7 米线
+机动车宽度 3.5 m
+车位宽度 2.5 m
+
+前轮最大转向角由内轮最大转角和外轮最大转角两个数据组成： 
+  1、内轮最大转角39.6°；
+  2、外轮最大转角33.5°。 
+ 车的转向角度与车的实际大小，运载低盘有关系，
+ 一般汽车的转向角在30度到40度之间，面包车的转向角都基本为30～34，轿车suv等车型为40。
+
+《汽车库、修车库、停车场设计防火规范》6.0.9 汽车疏散坡道的宽度不应小于4m，双车道不宜小于7m。
+
+-->
+<main id="car-parking" style="width:800px;position:relative">
+<aside>
+  <input type="number" v-model="L"/>
+  <label>X:
+    <input type="number" v-model="cx" step="10"/>
+  </label>
+  <label>Y:
+    <input type="number" v-model="cy" step="10"/>
+  </label>
+  <label>Rotate:
+    <input type="number" v-model="cr"/>
+  </label>
+</aside>
+<svg style="border:3px double black;margin:6px 0"
+  viewBox="-800 -800 2000 1500" 
+  width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+
+  <symbol id="parking-slot">
+    <rect x="0" y="0" width="250" height="500" fill="none" stroke="gray"/>
+  </symbol>
+  <!--car-model id="car-box"></car-model-->
+
+  <use xlink:href="#parking-slot" x="-500" y="0"/>
+  <use xlink:href="#parking-slot" x="-250" y="0"/>
+  <use xlink:href="#parking-slot" x="0"    y="0"/>
+  <use xlink:href="#parking-slot" x="250"  y="0"/>
+  <use xlink:href="#parking-slot" x="500"  y="0"/>
+
+    <!-- 七米线 -->
+    <line x1="-600" y1="-500" x2="900" y2="-500" stroke="black"/>
+    <text x="-720" y="-500" style="font-size:32px">5.00 m</text>
+
+    <line x1="-600" y1="-150" x2="900" y2="-150" stroke="black" stroke-dasharray="20"/>
+    <text x="-720" y="-150" style="font-size:32px">1.50 m</text>
+
+    <line x1="-600" y1="-200" x2="900" y2="-200" stroke="black" stroke-dasharray="50"/>
+    <text x="-720" y="-200" style="font-size:32px">2.00 m</text>
+
+    <line x1="-600" y1="-350" x2="900" y2="-350" stroke="black" stroke-dasharray="50"/>
+    <text x="-720" y="-350" style="font-size:32px">3.50 m</text>
+
+    <line x1="-600" y1="-400" x2="900" y2="-400" stroke="black"/>
+    <text x="-720" y="-400" style="font-size:32px">4.00 m</text>
+
+   <g transform="rotate(0, 0, 0)">
+    <car-outline :cx="cx" :cy="cy" :rotate="cr" :steering="sw" :gear="gear"></car-outline>
+   </g>
+
+   <!--g transform="rotate(0, 0, 0)">
+    <car-use model="car-box" :x="cx" :y="cy"></car-use>
+   </g-->
+</svg>
+<aside>
+  <span id="car-steering">
+  <label>
+    <output>{{sw>0?'+':''}}{{sw}}&deg;</output>
+    <br/>
+    L
+    <input title="Car Steering" type="range" v-model="sw" min="-45" max="45" step="1" style="vertical-align:middle"/>
+    R
+  </label>
+  </span>
+
+  <span id="car-gear">
+  <label>R</label>
+    <input title="Car Gear" type="range" v-model="gear" min="-1" max="1" step="1"/>
+  <label>D</label>
+  </span>
+</aside>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.min.js"></script>
+<script>
+Vue.component('car-wheel', {
+  props:{x:Number, y:Number, rotate:Number, position:String}, 
+  template:`
+    <g :transform="transform_rotate">
+      <rect :x="x-5" :y="y-20" width="10" height="40" fill="black" stroke="gray"/>
+
+      <!-- 轮胎垂线 -->
+      <line v-if="show_radius" :x1="x" :y1="y" :x2="x+600*left_or_right" :y2="y" stroke="silver" stroke-dasharray="10"/>
+
+      <!-- 轮胎轨迹 -->
+      <path :d="trace_path" fill="none" stroke="gray" fill="none" stroke-dasharray="10"/>
+    </g>
+  `,
+  computed: {
+    left_or_right: function(){
+      let steering = this.$root.steering;
+      return steering>0?1:(steering < 0?-1:0);
+    },
+    show_radius: function(){
+      let gear= this.$root.gear;
+      return gear!=0 && this.where!="back-outer";
+    },
+    transform_rotate:function(){
+      /*
+      let rotate = this.rotate || 0;
+      return `rotate(${rotate}, ${this.x}, ${this.y})`;
+      */
+
+      let R = this.$root.R;
+      let W = this.$root.car_width;
+      let L = this.$root.car_height;
+      let steering = this.$root.steering;
+      let drive    = this.$root.gear;
+      R = L/Math.tan(Math.abs(steering)*Math.PI/180);
+      let r=R;
+      let degree = 0; 
+      switch(this.where){
+         case "back-inner":
+           r = R;
+           break;
+         case "back-outer":
+           r = W + R;
+           break;
+         case "front-inner":
+           r = Math.sqrt(L*L + R*R);
+           degree = Math.asin(L/r)/Math.PI*180;
+           break;
+         case "front-outer":
+           r = Math.sqrt(L*L + (R+W)*(R+W));
+           degree = Math.asin(L/r)/Math.PI*180;
+           break;
+      }
+      if(steering<0) degree = -degree;
+      console.log(this.position, r, 'degree', degree);
+      return `rotate(${degree.toFixed(2)}, ${this.x}, ${this.y})`;
+    },
+    where: function(){
+      let where = ""; 
+      let steering = this.$root.steering;
+
+      switch(this.position){
+         case "back-right":
+            where = steering>0?"back-inner":"back-outer"; 
+            break;
+         case "back-left":
+            where = steering>0?"back-outer":"back-inner"; 
+            break;
+         case "front-left":
+            where = steering>0?"front-outer":"front-inner"; 
+            break;
+         case "front-right":
+            where = steering>0?"front-inner":"front-outer"; 
+            break;
+      }
+      return where;
+    },
+    trace_path: function(){
+      let R = this.$root.R;
+      let W = this.$root.car_width;
+      let L = this.$root.car_height;
+      let steering = this.$root.steering;
+      let drive    = this.$root.gear;
+      R = L/Math.tan(Math.abs(steering)*Math.PI/180);
+      let r=R;
+      let degree = 0; 
+
+      switch(this.where){
+         case "back-inner":
+           r = R;
+           break;
+         case "back-outer":
+           r = W + R;
+           break;
+         case "front-inner":
+           r = Math.sqrt(L*L + R*R);
+           degree = Math.asin(L/r)/Math.PI*180;
+           break;
+         case "front-outer":
+           r = Math.sqrt(L*L + (R+W)*(R+W));
+           degree = Math.asin(L/r)/Math.PI*180;
+           break;
+      }
+      console.log(this.position, r, 'degree', degree);
+
+      if(drive>0){
+        if(steering>0){
+           return `M ${this.x},${this.y} a ${r} ${r} 90 0 1 ${r} ${-r}`;
+        }else{
+           return `M ${this.x},${this.y} a ${r} ${r} 90 0 0 ${-r} ${-r}`;
+        }
+      }else if(drive<0){
+        if(steering>0){
+           return `M ${this.x},${this.y} a ${r} ${r} 90 0 0 ${r} ${r}`;
+        } else {
+           return `M ${this.x},${this.y} a ${r} ${r} 90 0 1 ${-r} ${r}`;
+        }
+      }else{
+        return ``;
+      }
+    } 
+  }
+});
+Vue.component('car-outline', {
+  props:{id:String, L:Number, W:Number, cx:Number, cy:Number, rotate:Number,
+    steering: Number,
+    gear: Number
+  }, 
+  data: function(){
+     return {x:0, y:0, car_width:170, car_height:250, R:260, H:120};
+  },
+  computed:{
+     llx: function(){return parseInt(this.x);},
+     lly: function(){return parseInt(this.y) + this.car_height;},
+     urx: function(){return parseInt(this.x) + this.car_width;},
+     ury: function(){return parseInt(this.y);},
+     seat_y: function(){return parseInt(this.y) + this.H;},
+     transform: function(){
+        return `translate(${this.cx}, ${this.cy}) rotate(${this.rotate}, 0, 0)`;
+     },
+     swerve: function(){
+        var radius = this.steering*Math.PI/180;
+        var rotate_x, rotate_y, rotate_degree;
+        var L = this.car_height;
+        var W = this.car_width;
+
+        if(this.steering>0){
+           rotate_x = W + L/Math.tan(radius);
+           rotate_y = L;
+           rotate_degree = 90;
+        }else if(this.steering<0){
+           rotate_x = L/Math.tan(radius);
+           rotate_y = L;
+           rotate_degree = -90;
+        }
+        if(this.gear<0) rotate_degree = -rotate_degree;
+        return {cx: rotate_x, cy:rotate_y, degree:rotate_degree};
+     },
+  },
+  template:`
+   <g :transform="transform">
+    <rect :x="x" :y="y" :width="170" height="250" fill="none" stroke="teal" stroke-width="3"/>
+    <!--line :x1="x+30" :y1="y" :x2="x+30" :y2="y+250" stroke="red" stroke-dasharray="10"/>
+    <line :x1="x+50" :y1="y" :x2="x+50" :y2="y+250" stroke="red" stroke-dasharray="10"/-->
+    <!--line x1="270" y1="0" x2="270" y2="450" stroke="red" stroke-dasharray="10"/-->
+    <!-- 靠背 -->
+    <line :x1="llx" :y1="seat_y" :x2="urx" :y2="seat_y" stroke="green" stroke-dasharray="10"/>
+    <!-- 轮胎 -->
+    <car-wheel :x='llx' :y='ury' rotate="27.5" position="front-left"></car-wheel>
+    <car-wheel :x='urx' :y='ury' rotate="35" position="front-right"></car-wheel>
+    <car-wheel :x='llx' :y='lly' position="back-left"></car-wheel>
+    <car-wheel :x='urx' :y='lly' position="back-right"></car-wheel>
+
+    <rect :x="x" :y="y" :width="170" height="250" fill="transparent" stroke="teal" stroke-width="3" stroke-dasharray="10">
+     <animateTransform attributeName="transform"
+                          attributeType="XML"
+                          type="rotate"
+                          :from="[0, swerve.cx, swerve.cy].join(' ')"
+                          :to="[swerve.degree, swerve.cx, swerve.cy].join(' ')"
+                          dur="5s"
+                          begin="click"
+                          repeatCount="1" fill="freeze"/>
+     </rect>
+   </g>
+  `
+});
+
+Vue.component('car-use', {
+  props:{model:String, L:Number, W:Number, x:Number, y:Number, rotate:Number},
+  computed:{
+     transform: function(){
+        return `rotate(0, 0, 0)`;
+     },
+     swerve: function(){
+        var radius = this.steering*Math.PI/180;
+        var rotate_x, rotate_y;
+        if(this.steering>0){
+           rotate_x = this.W + this.L/Math.tan(radius);
+           rotate_y = this.L;
+        }else if(this.steering<0){
+           rotate_x = this.L/Math.tan(radius);
+           rotate_y = this.L;
+        }
+        return {cx: rotate_x, cy:rotate_y};
+     }
+  },
+  template: `<use v-bind:xlink:href="'#' + model" :x="x"  :y="y" :transform="transform"></use>`
+});
+
+new Vue({
+  el:'#car-parking',
+  data: {
+    strokeColor:'red',
+    car_width: 170,
+    car_height: 250,
+    L: 250,
+    W: 170,
+    R: 350,
+    cx: 40,
+    cy: -140,
+    cr: 0,
+    sw: 40,
+    gear: 1
+  },
+  computed: {
+    steering: function(){
+       return this.sw;
+    },
+
+    back_inner_trace: function(){
+      let r=250;
+      return `M 170,250 a ${r} ${r} 90 0 1 ${r} -${r}`;
+    }, 
+    back_outer_trace: function(){
+      let r=420;
+      return `M 0,250 a ${r} ${r} 90 0 1 ${r} -${r}`;
+    } 
+  }
+});
+</script>
+</body>
+</html>
