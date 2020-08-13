@@ -1,20 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
+ <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<title>Car Parking Trace</title>
 <style>
 body {
-  padding:1em;
+  padding:0em;
 }
 
 main {
+  position:relative;
+  max-width:800px;
   margin:auto;
+}
+
+main > svg {
+  max-width:800px;
+  border:3px double black;
+  margin:0 0;
 }
 
 #car-steering {
   display:inline-block;
   position:absolute;
-  right:0px;
-  bottom: 120px;
+  right:80px; top: 56px;
   text-align:center;
 }
 #car-steering input[type="range"] {
@@ -23,8 +34,7 @@ main {
 #car-gear {
   display: inline-block;
   position:absolute;
-  right: -8px;
-  bottom: 0px;
+  right: -60px; top: 140px;
   transform: rotate(-90deg);
   transform-origin: 0 0;
 }
@@ -32,6 +42,18 @@ main {
 #car-gear input[type="range"] {
    vertical-align:middle;
    width:60px;
+}
+
+#car-location {
+  margin-bottom: -2.4em;
+  position: absolute;
+  top: 1em;
+  left: 1em;
+}
+
+input[type="number"] {
+  max-width:5em;
+  text-align:center;
 }
 </style>
 </head>
@@ -70,8 +92,8 @@ power: 1368 ml / 110 kw
 《汽车库、修车库、停车场设计防火规范》6.0.9 汽车疏散坡道的宽度不应小于4m，双车道不宜小于7m。
 
 -->
-<main id="car-parking" style="width:800px;position:relative">
-<aside>
+<main id="car-parking">
+<aside id="car-location">
   <input type="number" v-model="L"/>
   <label>X:
     <input type="number" v-model="cx" step="10"/>
@@ -83,9 +105,7 @@ power: 1368 ml / 110 kw
     <input type="number" v-model="cr"/>
   </label>
 </aside>
-<svg style="border:3px double black;margin:6px 0"
-  viewBox="-800 -800 2000 1500" 
-  width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-800 -800 2000 1500"> 
 
   <symbol id="parking-slot">
     <rect x="0" y="0" width="250" height="500" fill="none" stroke="gray"/>
@@ -352,7 +372,7 @@ Vue.component('car-use', {
 });
 
 new Vue({
-  el:'#car-parking',
+  el:'main#car-parking',
   data: {
     strokeColor:'red',
     car_width: 170,
