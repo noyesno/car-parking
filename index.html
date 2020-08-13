@@ -18,8 +18,9 @@ main {
 
 main > svg {
   max-width:800px;
-  border:3px double black;
   margin:0 0;
+  border:3px double black;
+  border-radius:6px;
 }
 
 #car-steering {
@@ -322,8 +323,8 @@ Vue.component('car-outline', {
      },
   },
   template:`
-   <g :transform="transform">
-    <rect :x="x" :y="y" :width="170" height="250" fill="none" stroke="teal" stroke-width="3"/>
+   <g class="car-outline" :transform="transform">
+    <rect :x="x" :y="y" :width="170" height="250" fill="transparent" stroke="teal" stroke-width="3"/>
     <!--line :x1="x+30" :y1="y" :x2="x+30" :y2="y+250" stroke="red" stroke-dasharray="10"/>
     <line :x1="x+50" :y1="y" :x2="x+50" :y2="y+250" stroke="red" stroke-dasharray="10"/-->
     <!--line x1="270" y1="0" x2="270" y2="450" stroke="red" stroke-dasharray="10"/-->
@@ -399,8 +400,87 @@ new Vue({
       let r=420;
       return `M 0,250 a ${r} ${r} 90 0 1 ${r} -${r}`;
     } 
+  },
+  mounted: function(){
+     var car = document.querySelector(".car-outline");
+     svg_drag(car);
   }
 });
+
+function svg_drag(target){
+  var selectedElement = null;
+  var future;
+
+  var svg = target.ownerSVGElement;
+
+  function getSVGLocation(evt, matrix){
+     var dragX = evt.clientX, dragY = evt.clientY;
+
+     if(0){
+       dragX = svgX*matrix.a + matrix.e;
+       dragY = svgY*matrix.d + matrix.f;
+     }else{
+       svgX = (dragX-matrix.e)/matrix.a;
+       svgY = (dragY-matrix.f)/matrix.d;
+     }
+     return {x:svgX, y:svgY};
+  }
+
+  target.addEventListener("mousedown", function(evt){
+     selectedElement = target; //evt.target;
+
+     var bbox = selectedElement.getBBox(); 
+     var matrix = selectedElement.getScreenCTM();
+     var loc  = getSVGLocation(evt, matrix);
+
+     future = future || {timer:null, x:0, y:0, dx:0, dy:0, matrix:matrix}; 
+     future.dx = loc.x; // loc.x - bbox.x;
+     future.dy = loc.y; // loc.y - bbox.y;
+  });
+
+  svg.addEventListener("mouseup", function(evt){
+     selectedElement = null;
+  });
+
+
+  svg.addEventListener("mousemove", function(evt){
+     if(!selectedElement){
+        return;
+     }
+
+     future.x = evt.clientX;
+     future.y = evt.clientY;
+     future.matrix = svg.getScreenCTM();
+     future.element = selectedElement;
+
+     if(future.timer) {
+       return;
+     }
+
+
+     future.timer = window.requestAnimationFrame(function(){
+         var dragX = future.x, dragY=future.y, matrix=future.matrix;
+         var svgX, svgY;
+
+         if(0){
+           dragX = svgX*matrix.a + matrix.e;
+           dragY = svgY*matrix.d + matrix.f;
+         }else{
+           svgX = (dragX-matrix.e)/matrix.a;
+           svgY = (dragY-matrix.f)/matrix.d;
+         }
+         svgX -= future.dx;
+         svgY -= future.dy;
+         // console.log(future);
+
+         var transform = `translate(${svgX}, ${svgY})`;
+         // console.log(transform);
+         future.element.setAttribute("transform", transform);
+         future.timer=null;
+     });
+  });
+  
+}
 </script>
 </body>
 </html>
